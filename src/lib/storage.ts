@@ -6,6 +6,8 @@ export interface Settings {
   /** Highlight the correct stroke after this many misses in practice (false = never). */
   hintAfterMisses: number | false;
   showGrid: boolean;
+  /** Words to review or learn per day. */
+  dailyGoal: number;
 }
 
 export interface LessonProgress {
@@ -17,17 +19,29 @@ export interface AppState {
   srs: Record<string, Card>;
   lessons: Record<string, LessonProgress>;
   settings: Settings;
+  /** Words reviewed or learned per local day (YYYY-MM-DD). */
+  activity: Record<string, number>;
+  /** When settings last changed (ms), for last-write-wins sync. */
+  settingsUpdatedAt: number;
+  /** When progress was last reset (ms); older data from other devices is discarded. */
+  resetAt: number;
+  /** Account this progress was last synced with, so another account never inherits it. */
+  syncedUserId: string | null;
 }
 
 export const STORAGE_KEY = 'hanzi-trainer:v1';
 
-export const DEFAULT_SETTINGS: Settings = { leniency: 1, hintAfterMisses: 3, showGrid: true };
+export const DEFAULT_SETTINGS: Settings = { leniency: 1, hintAfterMisses: 3, showGrid: true, dailyGoal: 10 };
 
 export const createInitialState = (): AppState => ({
   version: 1,
   srs: {},
   lessons: {},
   settings: { ...DEFAULT_SETTINGS },
+  activity: {},
+  settingsUpdatedAt: 0,
+  resetAt: 0,
+  syncedUserId: null,
 });
 
 type KeyValueStore = Pick<Storage, 'getItem' | 'setItem'>;
@@ -57,10 +71,10 @@ export function loadState(store: KeyValueStore = defaultStore()): AppState {
     if (!raw) return createInitialState();
     const parsed = JSON.parse(raw) as Partial<AppState>;
     if (parsed.version !== 1) return createInitialState();
+    // Fields added after the first release fall back to their defaults.
     return {
-      version: 1,
-      srs: parsed.srs ?? {},
-      lessons: parsed.lessons ?? {},
+      ...createInitialState(),
+      ...parsed,
       settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
     };
   } catch {

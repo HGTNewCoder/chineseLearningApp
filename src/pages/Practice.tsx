@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PromptCard } from '../components/PromptCard';
 import { ResultBanner } from '../components/ResultBanner';
 import { WordWriter, type WordWriterHandle } from '../components/WordWriter';
 import { buildQueue, isPass, type Card } from '../lib/srs';
 import type { LessonProgress } from '../lib/storage';
-import { getWord, LESSONS } from '../lib/vocab';
+import { LESSONS, levelOf } from '../lib/vocab';
 import { useProgress } from '../state/ProgressContext';
+import { useWords } from '../state/useWords';
 
 export const SESSION_SIZE = 10;
 
@@ -18,11 +19,13 @@ interface Result {
 
 /** Words from lessons the user has started that aren't in the deck yet. */
 function startedLessonWordIds(lessons: Record<string, LessonProgress>): string[] {
-  return LESSONS.filter((l) => (lessons[l.id]?.completedWordIds.length ?? 0) > 0).flatMap((l) => l.words.map((w) => w.id));
+  return LESSONS.filter((l) => (lessons[l.id]?.completedWordIds.length ?? 0) > 0).flatMap((l) => l.wordIds);
 }
 
 function makeQueue(srs: Record<string, Card>, lessons: Record<string, LessonProgress>, includeNotDue = false) {
-  return buildQueue(srs, Date.now(), {
+  // Skip cards for words no longer in the vocabulary.
+  const known = Object.fromEntries(Object.entries(srs).filter(([id]) => levelOf(id) !== undefined));
+  return buildQueue(known, Date.now(), {
     size: SESSION_SIZE,
     newWordIds: startedLessonWordIds(lessons),
     includeNotDue,
@@ -39,7 +42,14 @@ export function PracticePage() {
   const requeued = useRef(new Set<string>());
   const writerRef = useRef<WordWriterHandle>(null);
 
-  const word = queue[index] ? getWord(queue[index]) : undefined;
+  const { words, error } = useWords(queue);
+  const wordId = queue[index];
+  const word = wordId ? words?.[wordId] : undefined;
+
+  // Cloud sync can bring in due words after the page opened; pick them up while idle.
+  useEffect(() => {
+    if (queue.length === 0) setQueue(makeQueue(state.srs, state.lessons));
+  }, [state.srs, state.lessons, queue.length]);
 
   const finish = (mistakes: number, passed: boolean, gaveUp: boolean) => {
     if (!word || result) return;
@@ -96,7 +106,7 @@ export function PracticePage() {
     );
   }
 
-  if (!word) {
+  if (index >= queue.length) {
     return (
       <section className="page empty-state">
         <h1>Session complete</h1>
@@ -111,6 +121,24 @@ export function PracticePage() {
             Home
           </Link>
         </div>
+      </section>
+    );
+  }
+
+  if (!word) {
+    return (
+      <section className="page empty-state">
+        {error ? (
+          <>
+            <h1>Couldn’t load words</h1>
+            <p className="muted">Check your connection and try again.</p>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </>
+        ) : (
+          <p className="muted">Loading…</p>
+        )}
       </section>
     );
   }

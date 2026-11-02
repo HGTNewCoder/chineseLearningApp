@@ -1,0 +1,7 @@
+# Netlify / Cloudflare Pages cache rules.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/char-data/*
+  Cache-Control: public, max-age=2592000
+/sw.js
+  Cache-Control: no-cache

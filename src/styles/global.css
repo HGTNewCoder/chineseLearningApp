@@ -674,3 +674,110 @@ select {
     font-size: 1.35rem;
   }
 }
+
+/* Daily goal */
+.goal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.goal__text {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.goal__title {
+  font-weight: 600;
+}
+.goal .progress {
+  height: 8px;
+}
+
+/* Level tabs */
+.level-tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+  padding-bottom: 0.25rem;
+}
+.level-tab {
+  font: inherit;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: none;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.level-tab.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.level-tab__meta {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Account */
+.signin-form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.signin-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+input[type='email'] {
+  font: inherit;
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+.sync-status {
+  font-weight: 500;
+}
+.sync-status.is-synced {
+  color: var(--success);
+}
+.sync-status.is-error,
+.sync-status.is-offline {
+  color: var(--warn);
+}
+
+/* About & footer */
+.about ul {
+  padding-left: 1.2rem;
+}
+.about li {
+  margin-bottom: 0.5rem;
+}
+.about h2 {
+  margin-top: 1.5rem;
+}
+.footer {
+  text-align: center;
+  padding: 1.5rem 1rem 2rem;
+  font-size: 0.85rem;
+}
+.footer a {
+  color: var(--muted);
+}

@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useProgress } from '../state/ProgressContext';
+import { useSync } from '../sync/SyncProvider';
 
 const LENIENCY_LABELS: Record<string, string> = { '0.6': 'Strict', '1': 'Normal', '1.4': 'Relaxed' };
 
 export function SettingsPage() {
   const { state, updateSettings, resetProgress } = useProgress();
   const { settings } = state;
+  const sync = useSync();
   const [confirmingReset, setConfirmingReset] = useState(false);
 
   return (
@@ -52,8 +55,38 @@ export function SettingsPage() {
       </fieldset>
 
       <fieldset className="field">
+        <legend>Daily goal</legend>
+        <select
+          value={settings.dailyGoal}
+          onChange={(e) => updateSettings({ dailyGoal: Number(e.target.value) })}
+          aria-label="Words per day"
+        >
+          {[5, 10, 20, 30, 50].map((n) => (
+            <option key={n} value={n}>
+              {n} words a day
+            </option>
+          ))}
+        </select>
+        <p className="hint">Reviews and newly learned words both count.</p>
+      </fieldset>
+
+      <fieldset className="field">
         <legend>Progress</legend>
-        <p className="hint">Progress is saved in this browser only.</p>
+        <p className="hint">
+          {sync.email ? (
+            <>Synced to {sync.email}. Resetting erases progress on all your devices.</>
+          ) : (
+            <>
+              Progress is saved in this browser only.
+              {sync.enabled && (
+                <>
+                  {' '}
+                  <Link to="/account">Sign in</Link> to back it up.
+                </>
+              )}
+            </>
+          )}
+        </p>
         {confirmingReset ? (
           <div className="button-row">
             <button

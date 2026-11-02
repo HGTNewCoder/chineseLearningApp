@@ -6,23 +6,29 @@
   "scripts": {
     "chardata": "node scripts/build-char-data.mjs",
     "vocab": "node scripts/build-vocab.mjs",
+    "icons": "node scripts/build-icons.mjs",
     "predev": "npm run chardata",
     "dev": "vite",
     "prebuild": "npm run chardata",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "e2e": "npm run build && playwright test",
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@sentry/react": "^11.10.0",
+    "@supabase/supabase-js": "^2.118.0",
     "hanzi-writer": "^3.7.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",

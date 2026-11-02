@@ -8,6 +8,7 @@ import { isPass } from '../lib/srs';
 import type { Lesson } from '../lib/types';
 import { getLesson, getNextLesson } from '../lib/vocab';
 import { useProgress } from '../state/ProgressContext';
+import { useWords } from '../state/useWords';
 
 type Step = 'intro' | 'strokes' | 'trace' | 'recall';
 
@@ -40,7 +41,7 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
   const completed = state.lessons[lesson.id]?.completedWordIds ?? [];
 
   const [wordIndex, setWordIndex] = useState(() => {
-    const firstOpen = lesson.words.findIndex((w) => !completed.includes(w.id));
+    const firstOpen = lesson.wordIds.findIndex((id) => !completed.includes(id));
     return firstOpen === -1 ? 0 : firstOpen;
   });
   const [step, setStep] = useState<Step>('intro');
@@ -49,8 +50,10 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
   const [recallMistakes, setRecallMistakes] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
   const writerRef = useRef<WordWriterHandle>(null);
+  const { words, error } = useWords(lesson.wordIds);
 
-  const word = lesson.words[wordIndex];
+  const wordId = lesson.wordIds[wordIndex];
+  const word = words?.[wordId];
   const { settings } = state;
   const nextLesson = getNextLesson(lesson.id);
 
@@ -68,13 +71,13 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
   };
 
   const nextWord = () => {
-    if (wordIndex + 1 < lesson.words.length) goToWord(wordIndex + 1);
+    if (wordIndex + 1 < lesson.wordIds.length) goToWord(wordIndex + 1);
     else setFinished(true);
   };
 
   const handleRecallComplete = (mistakes: number) => {
     setRecallMistakes(mistakes);
-    completeLessonWord(lesson.id, word.id);
+    completeLessonWord(lesson.id, wordId);
   };
 
   if (finished) {
@@ -82,13 +85,13 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
       <section className="page lesson-done">
         <h1>Lesson complete 🎉</h1>
         <p className="muted">
-          You learned {lesson.words.length} words. They’re now in your review deck, so practice them over the next few
+          You learned {lesson.wordIds.length} words. They’re now in your review deck, so practice them over the next few
           days to make them stick.
         </p>
         <div className="word-chips">
-          {lesson.words.map((w) => (
-            <span key={w.id} className="chip" lang="zh-Hans">
-              {w.hanzi}
+          {lesson.wordIds.map((id) => (
+            <span key={id} className="chip" lang="zh-Hans">
+              {id}
             </span>
           ))}
         </div>
@@ -109,7 +112,25 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
     );
   }
 
-  const writerKey = `${word.id}-${step}-${attempt}`;
+  if (!word) {
+    return (
+      <section className="page empty-state">
+        {error ? (
+          <>
+            <h1>Couldn’t load this lesson</h1>
+            <p className="muted">Check your connection and try again.</p>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </>
+        ) : (
+          <p className="muted">Loading lesson…</p>
+        )}
+      </section>
+    );
+  }
+
+  const writerKey = `${wordId}-${step}-${attempt}`;
 
   return (
     <section className="page lesson">
@@ -119,21 +140,21 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
         </Link>
         <h1>{lesson.title}</h1>
         <p className="muted">
-          Word {wordIndex + 1} of {lesson.words.length}
+          Word {wordIndex + 1} of {lesson.wordIds.length}
         </p>
       </header>
 
       <nav className="word-chips" aria-label="Words in this lesson">
-        {lesson.words.map((w, i) => (
+        {lesson.wordIds.map((id, i) => (
           <button
-            key={w.id}
-            className={`chip${i === wordIndex ? ' is-active' : ''}${completed.includes(w.id) ? ' is-done' : ''}`}
+            key={id}
+            className={`chip${i === wordIndex ? ' is-active' : ''}${completed.includes(id) ? ' is-done' : ''}`}
             onClick={() => goToWord(i)}
             aria-current={i === wordIndex ? 'true' : undefined}
             lang="zh-Hans"
-            title={`${w.pinyin}: ${w.english}`}
+            title={words?.[id] ? `${words[id].pinyin}: ${words[id].english}` : undefined}
           >
-            {w.hanzi}
+            {id}
           </button>
         ))}
       </nav>
@@ -223,7 +244,7 @@ function LessonFlow({ lesson }: { lesson: Lesson }) {
                   Try again
                 </button>
                 <button className="btn btn-primary" onClick={nextWord} autoFocus>
-                  {wordIndex + 1 < lesson.words.length ? 'Next word →' : 'Finish lesson'}
+                  {wordIndex + 1 < lesson.wordIds.length ? 'Next word →' : 'Finish lesson'}
                 </button>
               </ResultBanner>
             )}

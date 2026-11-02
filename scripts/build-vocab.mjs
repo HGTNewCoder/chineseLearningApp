@@ -1,7 +1,9 @@
-// One-time generator for src/data/vocab.json from HSK 2.0 levels 1–2.
-// Source: https://github.com/drkameleon/complete-hsk-vocabulary (MIT).
+// Generates the vocabulary from HSK 2.0 levels 1–6 (run once; output is committed):
+//   src/data/lessons.json     lesson index (ids, titles, word ids), bundled with the app
+//   public/vocab/hsk<N>.json  full word details per level, fetched on demand
+// Source: https://github.com/drkameleon/complete-hsk-vocabulary (MIT; meanings from CC-CEDICT, CC BY-SA 4.0).
 // Usage: npm run vocab
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +12,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const charDataDir = dirname(require.resolve('hanzi-writer-data/package.json'));
 const SOURCE = 'https://raw.githubusercontent.com/drkameleon/complete-hsk-vocabulary/main/wordlists/exclusive/old';
-const LEVELS = [1, 2];
+const LEVELS = [1, 2, 3, 4, 5, 6];
+const LESSON_SIZE = 10;
 
 const UNUSABLE = /^(surname|(old )?variant of|see |used in|also pr\.|\(old\)|\((slang|Tw|dialect|literary|onom\.|coll\.|military)\))|\(archaic\)|\bsurname\b/i;
 
@@ -70,28 +73,42 @@ function pickForm(forms) {
   return { pinyin: best.form.transcriptions.pinyin, english: senses.slice(0, 3).join('; ') };
 }
 
-const vocab = [];
 const seen = new Set();
 const skipped = [];
+const lessons = [];
+mkdirSync(join(root, 'public/vocab'), { recursive: true });
 
 for (const level of LEVELS) {
   const res = await fetch(`${SOURCE}/${level}.json`);
   if (!res.ok) throw new Error(`Failed to fetch HSK ${level}: ${res.status}`);
   const entries = (await res.json()).sort((a, b) => (a.frequency ?? 1e9) - (b.frequency ?? 1e9));
 
+  const words = [];
   for (const entry of entries) {
     const hanzi = entry.simplified.trim();
-    if (seen.has(hanzi)) continue;
-    const chars = [...hanzi];
-    if (!chars.every((c) => existsSync(join(charDataDir, `${c}.json`)))) {
+    if (seen.has(hanzi) || !/^\p{Script=Han}+$/u.test(hanzi)) continue;
+    if (![...hanzi].every((c) => existsSync(join(charDataDir, `${c}.json`)))) {
       skipped.push(hanzi);
       continue;
     }
     seen.add(hanzi);
-    vocab.push({ id: hanzi, hanzi, ...pickForm(entry.forms), ...OVERRIDES[hanzi], hsk: level });
+    words.push({ id: hanzi, hanzi, ...pickForm(entry.forms), ...OVERRIDES[hanzi], hsk: level });
   }
+
+  for (let i = 0; i < words.length; i += LESSON_SIZE) {
+    const number = i / LESSON_SIZE + 1;
+    lessons.push({
+      id: `hsk${level}-${number}`,
+      title: `HSK ${level} · Lesson ${number}`,
+      hsk: level,
+      number,
+      wordIds: words.slice(i, i + LESSON_SIZE).map((w) => w.id),
+    });
+  }
+  writeFileSync(join(root, `public/vocab/hsk${level}.json`), JSON.stringify(words) + '\n');
+  console.log(`HSK ${level}: ${words.length} words`);
 }
 
-writeFileSync(join(root, 'src/data/vocab.json'), JSON.stringify(vocab, null, 2) + '\n');
-console.log(`Wrote ${vocab.length} words to src/data/vocab.json`);
+writeFileSync(join(root, 'src/data/lessons.json'), JSON.stringify(lessons) + '\n');
+console.log(`Wrote ${lessons.length} lessons (${seen.size} words)`);
 if (skipped.length) console.log(`Skipped (no stroke data): ${skipped.join(' ')}`);

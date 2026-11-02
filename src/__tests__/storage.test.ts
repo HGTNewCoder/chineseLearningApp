@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, loadState, saveState, STORAGE_KEY } from '../lib/storage';
+import { createInitialState, DEFAULT_SETTINGS, loadState, saveState, STORAGE_KEY } from '../lib/storage';
 
 function fakeStore(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -10,7 +10,7 @@ function fakeStore(initial: Record<string, string> = {}) {
 
 describe('storage', () => {
   it('returns a fresh state when nothing is stored', () => {
-    expect(loadState(fakeStore())).toEqual({ version: 1, srs: {}, lessons: {}, settings: DEFAULT_SETTINGS });
+    expect(loadState(fakeStore())).toEqual(createInitialState());
   });
 
   it('round-trips saved state', () => {
