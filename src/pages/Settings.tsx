@@ -81,7 +81,7 @@ export function SettingsPage() {
               {sync.enabled && (
                 <>
                   {' '}
-                  <Link to="/account">Sign in</Link> to back it up.
+                  <Link to="/account">Log in</Link> to back it up.
                 </>
               )}
             </>

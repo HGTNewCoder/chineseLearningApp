@@ -43,23 +43,23 @@ All are optional; see `.env.example`. Without them the app runs local-only with 
 ### Setting up accounts and sync (Supabase)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run `supabase/migrations/20261101000000_progress.sql`. It creates the tables and row-level security so each user can only access their own progress.
-3. In **Authentication → URL Configuration**, set **Site URL** to your deployed URL and add `https://<your-domain>/account` (and `http://localhost:5173/account` for local testing) to **Redirect URLs**.
-4. Email sign-in links are on by default. Supabase's built-in email sender has a low hourly limit, so for real traffic connect your own SMTP provider under **Authentication → Emails**.
+2. In **SQL Editor**, run each file in `supabase/migrations/` in order (`…_progress.sql`, then `…_decks.sql`). They create the tables and row-level security so each user can only access their own progress and decks. If you set up sync before custom decks existed, run just `20261102000000_decks.sql`.
+3. In **Authentication → URL Configuration**, set **Site URL** to your deployed URL and add `https://<your-domain>/account` (and `http://localhost:5173/account` for local testing) to **Redirect URLs**. Confirmation and password-reset emails send people back there.
+4. People log in with email and password (**Authentication → Sign In / Providers → Email**, on by default). Leave **Confirm email** on so new accounts must click a link before logging in; the password-reset emails also use it. Supabase's built-in email sender only allows a few emails an hour, so for real traffic connect your own SMTP provider under **Authentication → Emails**.
 5. Copy **Project URL** and the **anon public key** (Project Settings → API) into `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
 The anon key is designed to be public; row-level security is what protects the data. Never put the `service_role` key in the app.
 
 ## How sync works
 
-Progress always saves to the browser first. When signed in, the app merges with the cloud copy on sign-in, when the tab regains focus and when the connection returns, and uploads changes about a second after they happen (`src/sync/`):
+Progress always saves to the browser first. When logged in, the app merges with the cloud copy on login, when the tab regains focus and when the connection returns, and uploads changes about a second after they happen (`src/sync/`):
 
 - each word keeps its most recent review, and a word learned fresh never overwrites review history from another device
 - lesson progress is combined from all devices
-- the latest settings win
+- the latest settings win, and each custom flashcard deck keeps its most recent edit (deleting a deck removes it everywhere)
 - resetting progress erases it on every device
 
-Signing out clears the device's copy. A different account signing in on the same browser never inherits the previous user's progress.
+Logging out clears the device's copy. A different account logging in on the same browser never inherits the previous user's progress.
 
 ## Data and licenses
 

@@ -1,3 +1,4 @@
+import type { CustomDeck } from '../lib/decks';
 import type { Card } from '../lib/srs';
 import type { AppState, LessonProgress } from '../lib/storage';
 import { dayKey } from '../lib/streak';
@@ -32,7 +33,8 @@ function since(state: AppState, resetAt: number): AppState {
 /**
  * Merges two copies of a user's progress (this device and the cloud):
  * newest card wins, lesson progress is unioned, daily activity takes the max,
- * newest settings win, and anything older than the latest reset is dropped.
+ * newest settings and newest copy of each deck win, and progress older than
+ * the latest reset is dropped.
  */
 export function mergeStates(localIn: AppState, remoteIn: AppState): AppState {
   const resetAt = Math.max(localIn.resetAt, remoteIn.resetAt);
@@ -55,6 +57,11 @@ export function mergeStates(localIn: AppState, remoteIn: AppState): AppState {
     activity[day] = Math.max(count, activity[day] ?? 0);
   }
 
+  const decks: Record<string, CustomDeck> = { ...remote.decks };
+  for (const [id, deck] of Object.entries(local.decks)) {
+    if (!decks[id] || deck.updatedAt >= decks[id].updatedAt) decks[id] = deck;
+  }
+
   const settingsFrom = local.settingsUpdatedAt >= remote.settingsUpdatedAt ? local : remote;
 
   return {
@@ -62,6 +69,7 @@ export function mergeStates(localIn: AppState, remoteIn: AppState): AppState {
     srs,
     lessons,
     activity,
+    decks,
     settings: settingsFrom.settings,
     settingsUpdatedAt: settingsFrom.settingsUpdatedAt,
     resetAt,

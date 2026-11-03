@@ -40,7 +40,7 @@ test('learns a word in a lesson, then reviews it in practice', async ({ page }) 
 
   // Progress survives a reload: one word learned, two activities today (learn + review).
   await page.goto('/');
-  await expect(page.locator('.stat', { hasText: 'Words learned' })).toContainText(/^1 \//);
+  await expect(page.locator('.donut__center')).toHaveText(/^1\s*words learned$/);
   await expect(page.getByText(/Today: 2 \/ 10 words/)).toBeVisible();
   await expect(page.getByText('🔥 1-day streak')).toBeVisible();
 });
@@ -86,7 +86,65 @@ test('works offline after the first visit', async ({ page, context }) => {
 
 test('explains that sync is off when no backend is configured', async ({ page }) => {
   await page.goto('/account');
-  await expect(page.getByText(/Cloud sync isn’t set up/)).toBeVisible();
+  await expect(page.getByText(/Accounts aren’t set up/)).toBeVisible();
   await page.getByRole('link', { name: 'About & credits' }).click();
   await expect(page.getByRole('link', { name: 'Arphic Public License' })).toHaveAttribute('href', '/char-data/ARPHICPL.TXT');
+});
+
+test('flips through a deck with flashcards', async ({ page }) => {
+  await page.goto('/flashcards');
+  await expect(page.getByText('No decks yet.')).toBeVisible();
+  await page.getByRole('link', { name: '+ New deck' }).click();
+  await page.getByLabel('Deck name').fill('Lesson 2');
+  await page.getByRole('combobox', { name: 'HSK level' }).selectOption('1');
+  await page.getByRole('combobox', { name: 'Lesson' }).selectOption('hsk1-2');
+  await page.getByRole('button', { name: 'Select all 10' }).click();
+  await page.getByRole('button', { name: 'Save deck' }).click();
+
+  await page.getByRole('checkbox', { name: 'Shuffle cards' }).uncheck();
+  await page.getByRole('radio', { name: 'Meaning → characters' }).click();
+  await page.getByRole('button', { name: 'Start · 10 cards' }).click();
+
+  const card = page.locator('.flashcard');
+  const back = card.locator('.flashcard__face--back');
+  await expect(back).toBeEmpty(); // the answer isn't in the page until flipped
+  await page.keyboard.press('Space');
+  await expect(card).toHaveClass(/is-flipped/);
+  await expect(back.locator('.flashcard__hanzi')).not.toBeEmpty();
+
+  // Miss the first card once, then know every card.
+  await page.getByRole('button', { name: '✗ Again' }).click();
+  await expect(page.getByText('0 / 10 known')).toBeVisible();
+  for (let i = 0; i < 10; i++) {
+    await card.click();
+    await page.keyboard.press('ArrowRight');
+  }
+  await expect(page.getByRole('heading', { name: 'Deck complete' })).toBeVisible();
+  await expect(page.getByText('9 of 10 known on the first try')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review 1 missed' })).toBeVisible();
+});
+
+test('builds a custom deck from picked words and studies it', async ({ page }) => {
+  await page.goto('/flashcards');
+  await page.getByRole('link', { name: '+ New deck' }).click();
+  await page.getByLabel('Deck name').fill('Food');
+
+  await page.getByRole('searchbox', { name: 'Search words' }).fill('chi');
+  await page.getByRole('checkbox', { name: /^吃\s*chī/ }).check();
+  await page.getByRole('searchbox', { name: 'Search words' }).fill('mi fan');
+  await page.getByRole('checkbox', { name: /^米饭/ }).check();
+  await expect(page.getByText('2 words selected')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save deck' }).click();
+  await expect(page).toHaveURL(/\/flashcards\?deck=/);
+  await expect(page.getByRole('radio', { name: /Food/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Start · 2 cards' }).click();
+  await expect(page.getByRole('heading', { name: 'Food' })).toBeVisible();
+
+  // The deck survives a reload and can be edited.
+  await page.goto('/flashcards');
+  await page.getByRole('link', { name: 'Edit Food' }).click();
+  await page.getByRole('button', { name: 'Remove 米饭' }).click();
+  await page.getByRole('button', { name: 'Save deck' }).click();
+  await expect(page.getByText('(1 word)')).toBeVisible();
 });

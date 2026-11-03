@@ -72,6 +72,28 @@ describe('pushChanges', () => {
     expect(tables.profiles[0]).toMatchObject({ user_id: 'u1', settings: { dailyGoal: 30 }, settings_updated_at: T });
   });
 
+  it('uploads changed decks and reads them back', async () => {
+    const kept = { name: 'Old', wordIds: ['你'], createdAt: T, updatedAt: T };
+    const prev = state({ decks: { old: kept } });
+    const next = state({
+      decks: { old: kept, food: { name: 'Food', wordIds: ['吃', '好吃'], createdAt: T + 1, updatedAt: T + 2 } },
+    });
+    const { client, calls, tables } = fakeSupabase();
+    await pushChanges(client, 'u1', prev, next);
+    expect(calls).toEqual(['upsert decks 1']);
+    expect(tables.decks[0]).toEqual({
+      user_id: 'u1',
+      deck_id: 'food',
+      name: 'Food',
+      word_ids: ['吃', '好吃'],
+      created_at: T + 1,
+      updated_at: T + 2,
+      deleted: false,
+    });
+    const remote = await fetchRemote(client, 'u1');
+    expect(remote.decks).toEqual({ food: next.decks.food });
+  });
+
   it('clears the cloud copy and re-uploads after a reset', async () => {
     const { client, calls } = fakeSupabase({ cards: [{ word_id: 'old' }] });
     const prev = state({ srs: { old: newCard(T) } });

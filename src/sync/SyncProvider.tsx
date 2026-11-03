@@ -14,14 +14,23 @@ interface SyncApi {
   email: string | null;
   status: SyncStatus;
   lastSyncedAt: number | null;
-  /** Emails a one-time sign-in link. */
-  signIn: (email: string) => Promise<void>;
+  /** True after opening a password-reset link, until a new password is set. */
+  recovering: boolean;
+  logIn: (email: string, password: string) => Promise<void>;
+  /** Creates an account. `confirmEmail` is true when the user must click a link in their inbox first. */
+  signUp: (email: string, password: string) => Promise<{ confirmEmail: boolean }>;
+  /** Emails a link that opens the app ready to set a new password. */
+  sendPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   /** Signs out and clears this device's copy (it's safe in the cloud). */
   signOut: () => Promise<void>;
   syncNow: () => void;
 }
 
 const SyncContext = createContext<SyncApi | null>(null);
+
+/** Where confirmation and password-reset emails send people back to. */
+const accountUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}account`;
 
 const PUSH_DELAY_MS = 800;
 const REFRESH_MIN_INTERVAL_MS = 30_000;
@@ -37,6 +46,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<SyncStatus>(isCloudEnabled ? 'signed-out' : 'local-only');
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [recovering, setRecovering] = useState(false);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -52,7 +62,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       if (!sb) return;
       setClient(sb);
       sb.auth.getSession().then(({ data }) => setSession(data.session));
-      const { data } = sb.auth.onAuthStateChange((_event, s) => setSession(s));
+      const { data } = sb.auth.onAuthStateChange((event, s) => {
+        setSession(s);
+        if (event === 'PASSWORD_RECOVERY') setRecovering(true);
+        if (event === 'SIGNED_OUT') setRecovering(false);
+      });
       unsubscribe = () => data.subscription.unsubscribe();
     });
     return () => unsubscribe();
@@ -132,16 +146,48 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [state, client, userId, fail]);
 
-  const signIn = useCallback(
-    async (email: string) => {
-      if (!client) throw new Error('Cloud sync is not configured');
-      const { error } = await client.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}account` },
-      });
+  const requireClient = useCallback(() => {
+    if (!client) throw new Error('Accounts aren’t available right now. Try again in a moment.');
+    return client;
+  }, [client]);
+
+  const logIn = useCallback(
+    async (email: string, password: string) => {
+      const { error } = await requireClient().auth.signInWithPassword({ email, password });
       if (error) throw error;
     },
-    [client],
+    [requireClient],
+  );
+
+  const signUp = useCallback(
+    async (email: string, password: string) => {
+      const { data, error } = await requireClient().auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: accountUrl() },
+      });
+      if (error) throw error;
+      // No session means the project requires email confirmation first.
+      return { confirmEmail: !data.session };
+    },
+    [requireClient],
+  );
+
+  const sendPasswordReset = useCallback(
+    async (email: string) => {
+      const { error } = await requireClient().auth.resetPasswordForEmail(email, { redirectTo: accountUrl() });
+      if (error) throw error;
+    },
+    [requireClient],
+  );
+
+  const updatePassword = useCallback(
+    async (password: string) => {
+      const { error } = await requireClient().auth.updateUser({ password });
+      if (error) throw error;
+      setRecovering(false);
+    },
+    [requireClient],
   );
 
   const signOut = useCallback(async () => {
@@ -165,11 +211,15 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       email: session?.user.email ?? null,
       status,
       lastSyncedAt,
-      signIn,
+      recovering,
+      logIn,
+      signUp,
+      sendPasswordReset,
+      updatePassword,
       signOut,
       syncNow: () => void fullSync(),
     }),
-    [session, status, lastSyncedAt, signIn, signOut, fullSync],
+    [session, status, lastSyncedAt, recovering, logIn, signUp, sendPasswordReset, updatePassword, signOut, fullSync],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

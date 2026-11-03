@@ -1,3 +1,5 @@
+import type { CustomDeck } from './decks';
+import type { FlashcardFront } from './flashcards';
 import type { Card } from './srs';
 
 export interface Settings {
@@ -8,6 +10,8 @@ export interface Settings {
   showGrid: boolean;
   /** Words to review or learn per day. */
   dailyGoal: number;
+  /** Side shown first on flashcards. */
+  flashcardFront: FlashcardFront;
 }
 
 export interface LessonProgress {
@@ -19,6 +23,8 @@ export interface AppState {
   srs: Record<string, Card>;
   lessons: Record<string, LessonProgress>;
   settings: Settings;
+  /** Custom flashcard decks by id. They're the user's own content, so resetting progress keeps them. */
+  decks: Record<string, CustomDeck>;
   /** Words reviewed or learned per local day (YYYY-MM-DD). */
   activity: Record<string, number>;
   /** When settings last changed (ms), for last-write-wins sync. */
@@ -31,13 +37,20 @@ export interface AppState {
 
 export const STORAGE_KEY = 'hanzi-trainer:v1';
 
-export const DEFAULT_SETTINGS: Settings = { leniency: 1, hintAfterMisses: 3, showGrid: true, dailyGoal: 10 };
+export const DEFAULT_SETTINGS: Settings = {
+  leniency: 1,
+  hintAfterMisses: 3,
+  showGrid: true,
+  dailyGoal: 10,
+  flashcardFront: 'hanzi',
+};
 
 export const createInitialState = (): AppState => ({
   version: 1,
   srs: {},
   lessons: {},
   settings: { ...DEFAULT_SETTINGS },
+  decks: {},
   activity: {},
   settingsUpdatedAt: 0,
   resetAt: 0,

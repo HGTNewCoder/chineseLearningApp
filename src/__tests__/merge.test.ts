@@ -35,6 +35,16 @@ describe('mergeStates', () => {
     expect(merged.activity).toEqual({ d1: 5, d2: 1, d3: 2 });
   });
 
+  it('keeps the newest copy of each deck, including deletions', () => {
+    const deck = (name: string, updatedAt: number, deleted = false) => ({ name, wordIds: ['你'], createdAt: T, updatedAt, deleted });
+    const local = state({ decks: { a: deck('A local', T + 2), b: deck('B', T + 1), c: deck('C', T) } });
+    const remote = state({ decks: { a: deck('A remote', T + 1), b: deck('B', T + 3, true), d: deck('D', T) } });
+    const merged = mergeStates(local, remote);
+    expect(merged.decks.a.name).toBe('A local');
+    expect(merged.decks.b.deleted).toBe(true);
+    expect(Object.keys(merged.decks).sort()).toEqual(['a', 'b', 'c', 'd']);
+  });
+
   it('uses the most recently changed settings', () => {
     const local = state({ settings: { ...DEFAULT_SETTINGS, dailyGoal: 20 }, settingsUpdatedAt: T + 1 });
     const remote = state({ settings: { ...DEFAULT_SETTINGS, dailyGoal: 5 }, settingsUpdatedAt: T });

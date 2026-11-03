@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { CustomDeck } from '../lib/decks';
 import type { Card } from '../lib/srs';
 import { createInitialState, DEFAULT_SETTINGS, type AppState, type Settings } from '../lib/storage';
 
@@ -21,6 +22,15 @@ interface ActivityRow {
   user_id: string;
   day: string;
   count: number;
+}
+interface DeckRow {
+  user_id: string;
+  deck_id: string;
+  name: string;
+  word_ids: string[];
+  created_at: number;
+  updated_at: number;
+  deleted: boolean;
 }
 interface ProfileRow {
   user_id: string;
@@ -68,12 +78,23 @@ const cardToRow = (userId: string, wordId: string, c: Card): CardRow => ({
   lapses: c.lapses,
 });
 
+const deckToRow = (userId: string, deckId: string, d: CustomDeck): DeckRow => ({
+  user_id: userId,
+  deck_id: deckId,
+  name: d.name,
+  word_ids: d.wordIds,
+  created_at: d.createdAt,
+  updated_at: d.updatedAt,
+  deleted: d.deleted ?? false,
+});
+
 /** Reads the user's cloud copy into the same shape as local state. */
 export async function fetchRemote(client: SupabaseClient, userId: string): Promise<AppState> {
-  const [cards, lessonWords, activity, profiles] = await Promise.all([
+  const [cards, lessonWords, activity, decks, profiles] = await Promise.all([
     selectAll<CardRow>(client, 'cards', userId),
     selectAll<LessonWordRow>(client, 'lesson_words', userId),
     selectAll<ActivityRow>(client, 'daily_activity', userId),
+    selectAll<DeckRow>(client, 'decks', userId),
     selectAll<ProfileRow>(client, 'profiles', userId),
   ]);
   const state = createInitialState();
@@ -91,6 +112,15 @@ export async function fetchRemote(client: SupabaseClient, userId: string): Promi
     (state.lessons[r.lesson_id] ??= { completedWordIds: [] }).completedWordIds.push(r.word_id);
   }
   for (const r of activity) state.activity[r.day] = r.count;
+  for (const r of decks) {
+    state.decks[r.deck_id] = {
+      name: r.name,
+      wordIds: r.word_ids,
+      createdAt: Number(r.created_at),
+      updatedAt: Number(r.updated_at),
+      ...(r.deleted && { deleted: true }),
+    };
+  }
   const profile = profiles[0];
   if (profile) {
     state.settings = { ...DEFAULT_SETTINGS, ...profile.settings };
@@ -100,7 +130,7 @@ export async function fetchRemote(client: SupabaseClient, userId: string): Promi
   return state;
 }
 
-/** Deletes all of the user's progress in the cloud and records when. */
+/** Deletes all of the user's progress in the cloud and records when. Decks are kept. */
 export async function resetRemote(client: SupabaseClient, userId: string, resetAt: number) {
   for (const table of ['cards', 'lesson_words', 'daily_activity']) {
     check(await client.from(table).delete().eq('user_id', userId));
@@ -134,9 +164,14 @@ export async function pushChanges(client: SupabaseClient, userId: string, prev: 
     .filter(([day, count]) => prev.activity[day] !== count)
     .map(([day, count]) => ({ user_id: userId, day, count }));
 
+  const decks = Object.entries(next.decks)
+    .filter(([id, deck]) => prev.decks[id] !== deck)
+    .map(([id, deck]) => deckToRow(userId, id, deck));
+
   await upsertChunked(client, 'cards', cards);
   await upsertChunked(client, 'lesson_words', lessonWords);
   await upsertChunked(client, 'daily_activity', activity);
+  await upsertChunked(client, 'decks', decks);
 
   if (next.settingsUpdatedAt !== prev.settingsUpdatedAt || next.resetAt !== prev.resetAt) {
     const profile: ProfileRow = {

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { newDeckId } from '../lib/decks';
 import { newCard, review } from '../lib/srs';
 import { createInitialState, loadState, saveState, type AppState, type Settings } from '../lib/storage';
 import { addActivity } from '../lib/streak';
@@ -10,6 +11,9 @@ interface ProgressApi {
   /** Marks a word as learned in a lesson and adds it to the review deck. */
   completeLessonWord: (lessonId: string, wordId: string) => void;
   updateSettings: (patch: Partial<Settings>) => void;
+  /** Creates a deck (no id) or replaces an existing one's name and words; returns its id. */
+  saveDeck: (deck: { name: string; wordIds: string[] }, id?: string) => string;
+  deleteDeck: (id: string) => void;
   resetProgress: () => void;
   /** Replaces state wholesale (used by cloud sync). */
   replaceState: (update: (current: AppState) => AppState) => void;
@@ -54,10 +58,30 @@ export function ProgressProvider({ children, initialState }: { children: ReactNo
     setState((s) => ({ ...s, settings: { ...s.settings, ...patch }, settingsUpdatedAt: Date.now() }));
   }, []);
 
+  const saveDeck = useCallback((deck: { name: string; wordIds: string[] }, id?: string) => {
+    const deckId = id ?? newDeckId();
+    const now = Date.now();
+    setState((s) => ({
+      ...s,
+      decks: {
+        ...s.decks,
+        [deckId]: { name: deck.name, wordIds: deck.wordIds, createdAt: s.decks[deckId]?.createdAt ?? now, updatedAt: now },
+      },
+    }));
+    return deckId;
+  }, []);
+
+  const deleteDeck = useCallback((id: string) => {
+    setState((s) =>
+      s.decks[id] ? { ...s, decks: { ...s.decks, [id]: { ...s.decks[id], wordIds: [], deleted: true, updatedAt: Date.now() } } } : s,
+    );
+  }, []);
+
   const resetProgress = useCallback(() => {
     setState((s) => ({
       ...createInitialState(),
       settings: s.settings,
+      decks: s.decks,
       settingsUpdatedAt: s.settingsUpdatedAt,
       syncedUserId: s.syncedUserId,
       resetAt: Date.now(),
@@ -67,8 +91,8 @@ export function ProgressProvider({ children, initialState }: { children: ReactNo
   const replaceState = useCallback((update: (current: AppState) => AppState) => setState(update), []);
 
   const api = useMemo(
-    () => ({ state, recordReview, completeLessonWord, updateSettings, resetProgress, replaceState }),
-    [state, recordReview, completeLessonWord, updateSettings, resetProgress, replaceState],
+    () => ({ state, recordReview, completeLessonWord, updateSettings, saveDeck, deleteDeck, resetProgress, replaceState }),
+    [state, recordReview, completeLessonWord, updateSettings, saveDeck, deleteDeck, resetProgress, replaceState],
   );
 
   return <ProgressContext.Provider value={api}>{children}</ProgressContext.Provider>;
