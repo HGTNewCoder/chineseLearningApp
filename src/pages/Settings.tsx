@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { setPenOnly, usePenOnly } from '../lib/pen';
 import { useProgress } from '../state/ProgressContext';
 import { useSync } from '../sync/SyncProvider';
 
@@ -9,6 +10,7 @@ export function SettingsPage() {
   const { state, updateSettings, resetProgress } = useProgress();
   const { settings } = state;
   const sync = useSync();
+  const penOnly = usePenOnly();
   const [confirmingReset, setConfirmingReset] = useState(false);
 
   return (
@@ -52,6 +54,18 @@ export function SettingsPage() {
           <input type="checkbox" checked={settings.showGrid} onChange={(e) => updateSettings({ showGrid: e.target.checked })} />
           Show practice grid (米字格)
         </label>
+      </fieldset>
+
+      <fieldset className="field">
+        <legend>Apple Pencil</legend>
+        <label className="checkbox">
+          <input type="checkbox" checked={penOnly} onChange={(e) => setPenOnly(e.target.checked)} />
+          Write with Apple Pencil only
+        </label>
+        <p className="hint">
+          Ignores fingers and a resting palm on the writing box, so you can lean your hand on the screen. Turns on by
+          itself the first time you write with a Pencil. Applies to this device only.
+        </p>
       </fieldset>
 
       <fieldset className="field">

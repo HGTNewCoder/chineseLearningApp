@@ -53,6 +53,49 @@ test('counts a wrong stroke as a mistake', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('1 mistake');
 });
 
+test('writes with Apple Pencil while a palm rests on the screen', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'needs a touch screen');
+  const cdp = await page.context().newCDPSession(page);
+  const pen = (type: 'mousePressed' | 'mouseMoved' | 'mouseReleased', x: number, y: number) =>
+    cdp.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1, pointerType: 'pen' });
+  const palm = (type: 'touchStart' | 'touchEnd', x = 0, y = 0) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 9 }] });
+
+  /** A Pencil stroke across 一; `during` runs between samples (e.g. to put a palm down). */
+  const penStroke = async (during?: (i: number, box: { x: number; y: number; width: number; height: number }) => unknown) => {
+    const box = (await (await drawingCanvas(page)).boundingBox())!;
+    const y = box.y + box.height * 0.5;
+    const x0 = box.x + box.width * 0.12;
+    const x1 = box.x + box.width * 0.88;
+    await pen('mousePressed', x0, y);
+    for (let i = 1; i <= 20; i++) {
+      await during?.(i, box);
+      await pen('mouseMoved', x0 + ((x1 - x0) * i) / 20, y);
+    }
+    await pen('mouseReleased', x1, y);
+  };
+
+  await openYiFromMemory(page);
+
+  // The palm lands below the box mid-stroke and lifts again before the Pencil does.
+  await penStroke(async (i, box) => {
+    if (i === 2) await palm('touchStart', box.x + box.width * 0.5, box.y + box.height + 40);
+    if (i === 12) await palm('touchEnd');
+  });
+  await expect(page.getByRole('status')).toContainText('Perfect!');
+
+  // Having used a Pencil, the box now ignores touches: a palm resting on it first changes nothing.
+  await page.getByRole('button', { name: 'Try again' }).click();
+  const box = (await (await drawingCanvas(page)).boundingBox())!;
+  await palm('touchStart', box.x + box.width * 0.8, box.y + box.height * 0.85);
+  await penStroke();
+  await palm('touchEnd');
+  await expect(page.getByRole('status')).toContainText('Perfect!');
+
+  await page.goto('/settings');
+  await expect(page.getByRole('checkbox', { name: 'Write with Apple Pencil only' })).toBeChecked();
+});
+
 test('walks through a word stroke by stroke', async ({ page }) => {
   await page.goto('/lessons/hsk1-2');
   await page.getByRole('button', { name: '我们', exact: true }).click();

@@ -77,6 +77,12 @@
   box-sizing: border-box;
 }
 
+html {
+  /* No grey flash when tapping on iPad, and no double-tap zoom delaying taps. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -278,9 +284,33 @@ a {
   border-radius: 6px;
   box-shadow: var(--shadow);
 }
+/* Dragging an Apple Pencil across the writing area must never select text or open the loupe. */
+.word-writer,
+.char-canvas {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 .char-canvas.is-interactive {
   cursor: crosshair;
   touch-action: none;
+}
+/* Strokes reach Hanzi Writer through the Pointer Events layer in CharacterCanvas. */
+.char-canvas.is-interactive .char-canvas__target {
+  pointer-events: none;
+}
+.char-canvas__hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  background: var(--drawing);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.char-canvas__hover.is-visible {
+  opacity: 0.45;
 }
 .char-canvas.is-loading {
   animation: pulse 1.2s ease-in-out infinite;

@@ -2,6 +2,7 @@ import HanziWriter, { type CharacterJson } from 'hanzi-writer';
 import { useEffect, useId, useState } from 'react';
 import { loadCharData, medianLength, medianToPath, toScreen } from '../lib/hanzi';
 import { GridLines } from './CharacterCanvas';
+import { useCanvasSize } from './WordWriter';
 
 interface Props {
   hanzi: string;
@@ -21,7 +22,9 @@ interface Step {
  * current stroke is highlighted and drawn along its direction, with a dot
  * marking where to start.
  */
-export function StrokeStepper({ hanzi, size = 280, showGrid = true, onFinished }: Props) {
+export function StrokeStepper({ hanzi, size: sizeProp, showGrid = true, onFinished }: Props) {
+  const fittedSize = useCanvasSize(1);
+  const size = sizeProp ?? fittedSize;
   const chars = [...hanzi];
   const [data, setData] = useState<CharacterJson[] | null>(null);
   const [error, setError] = useState(false);

@@ -24,21 +24,36 @@ interface Props {
 }
 
 const MAX_SIZE = 280;
+/** Bigger boxes on tablets: an Apple Pencil or finger needs more room than a mouse. */
+const MAX_TOUCH_SIZE = 420;
 const MIN_SIZE = 120;
 const GAP = 12;
 
-/** Largest canvas size that fits `count` characters across the viewport. */
+const isTouchScreen = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+
+/** Largest canvas size that fits `count` characters across (and, on tablets, 45% of the height of) the viewport. */
 function fitSize(count: number): number {
-  const available = Math.min(window.innerWidth, 760) - 32;
+  const available = Math.min(window.innerWidth, 820) - 32;
   const size = Math.floor((available - GAP * (count - 1)) / count);
-  return Math.max(MIN_SIZE, Math.min(MAX_SIZE, size));
+  const max = isTouchScreen() ? Math.min(MAX_TOUCH_SIZE, Math.floor(window.innerHeight * 0.45)) : MAX_SIZE;
+  return Math.max(MIN_SIZE, Math.min(max, size));
 }
 
-function useCanvasSize(count: number): number {
+/**
+ * Canvas size for `count` characters. Only recomputed when the width changes (rotation, window
+ * resize): Safari on iPad changes the height as its toolbar shows and hides while scrolling, and
+ * resizing would restart a character mid-quiz.
+ */
+export function useCanvasSize(count: number): number {
   const [size, setSize] = useState(() => fitSize(count));
   useEffect(() => {
-    const onResize = () => setSize(fitSize(count));
-    onResize();
+    let width = window.innerWidth;
+    setSize(fitSize(count));
+    const onResize = () => {
+      if (window.innerWidth === width) return;
+      width = window.innerWidth;
+      setSize(fitSize(count));
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [count]);
